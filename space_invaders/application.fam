@@ -1,0 +1,9 @@
+App(
+	appid="space_invaders",
+	name="Space Invaders",
+	apptype=FlipperAppType.EXTERNAL,
+	entry_point="space_invaders_app",
+	requires=["gui"],
+	stack_size=2 * 1024,
+	fap_category="Games",
+)
