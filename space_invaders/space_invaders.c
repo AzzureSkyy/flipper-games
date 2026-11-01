@@ -3,6 +3,14 @@
 #include <input/input.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "imu.h"
+
+// Accelerometer axis (0=X, 1=Y, 2=Z) and direction used for tilt control.
+// Adjust if the ship moves the wrong way on your device.
+#define TILT_AXIS 0
+#define TILT_SIGN 1.0f
+#define TILT_DEADZONE 0.05f
+#define TILT_SPEED 10.0f
 
 #define SCREEN_W 128
 #define SCREEN_H 64
@@ -45,7 +53,15 @@ typedef struct {
 	Bullet ebullets[MAX_ENEMY_BULLETS];
 	int score, lives, wave;
 	bool over;
+	bool imu_ok;
+	float tilt_base;
 } Game;
+
+static float read_tilt(void) {
+	float a[3];
+	if(!imu_read_accel(a)) return 0.0f;
+	return a[TILT_AXIS] * TILT_SIGN;
+}
 
 static void new_wave(Game* g) {
 	for(int r = 0; r < ROWS; r++)
@@ -118,6 +134,10 @@ static void tick(Game* g) {
 
 	if(g->left) g->px -= 2;
 	if(g->right) g->px += 2;
+	if(g->imu_ok) {
+		float d = read_tilt() - g->tilt_base;
+		if(d > TILT_DEADZONE || d < -TILT_DEADZONE) g->px += (int)(d * TILT_SPEED);
+	}
 	if(g->px < 0) g->px = 0;
 	if(g->px > SCREEN_W - PLAYER_W) g->px = SCREEN_W - PLAYER_W;
 
@@ -242,6 +262,8 @@ int32_t space_invaders_app(void* p) {
 	Game* g = malloc(sizeof(Game));
 	memset(g, 0, sizeof(Game));
 	g->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+	g->imu_ok = imu_init();
+	if(g->imu_ok) g->tilt_base = read_tilt();
 	reset_game(g);
 
 	ViewPort* vp = view_port_alloc();
@@ -268,6 +290,8 @@ int32_t space_invaders_app(void* p) {
 			} else if(in->key == InputKeyRight) {
 				if(in->type == InputTypePress) g->right = true;
 				else if(in->type == InputTypeRelease) g->right = false;
+			} else if(in->key == InputKeyOk && in->type == InputTypeLong) {
+				if(g->imu_ok) g->tilt_base = read_tilt();
 			} else if(in->key == InputKeyOk && in->type == InputTypePress) {
 				if(g->over) {
 					reset_game(g);
@@ -286,6 +310,7 @@ int32_t space_invaders_app(void* p) {
 
 	furi_timer_stop(timer);
 	furi_timer_free(timer);
+	if(g->imu_ok) imu_deinit();
 	view_port_enabled_set(vp, false);
 	gui_remove_view_port(gui, vp);
 	view_port_free(vp);

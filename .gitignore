@@ -1,3 +1,7 @@
 *_raw.txt
 dist/
 build/
+.vscode/
+.clang-format
+.editorconfig
+.gitignore.ufbt

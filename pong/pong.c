@@ -3,6 +3,14 @@
 #include <input/input.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "imu.h"
+
+// Accelerometer axis (0=X, 1=Y, 2=Z) and direction used for tilt control.
+// Adjust if the paddle moves the wrong way on your device.
+#define TILT_AXIS 1
+#define TILT_SIGN 1.0f
+#define TILT_DEADZONE 0.05f
+#define TILT_SPEED 12.0f
 
 #define SCREEN_W 128
 #define SCREEN_H 64
@@ -29,7 +37,15 @@ typedef struct {
 	float p1, p2;
 	int s1, s2;
 	bool up, down, paused, over;
+	bool imu_ok;
+	float tilt_base;
 } Pong;
+
+static float read_tilt(void) {
+	float a[3];
+	if(!imu_read_accel(a)) return 0.0f;
+	return a[TILT_AXIS] * TILT_SIGN;
+}
 
 static void reset_ball(Pong* g, int dir) {
 	g->bx = SCREEN_W / 2;
@@ -55,6 +71,10 @@ static void tick(Pong* g) {
 
 	if(g->up) g->p1 -= 2.0f;
 	if(g->down) g->p1 += 2.0f;
+	if(g->imu_ok) {
+		float d = read_tilt() - g->tilt_base;
+		if(d > TILT_DEADZONE || d < -TILT_DEADZONE) g->p1 += d * TILT_SPEED;
+	}
 	g->p1 = clampf(g->p1, 0, SCREEN_H - PADDLE_H);
 
 	float center = g->p2 + PADDLE_H / 2.0f;
@@ -155,6 +175,8 @@ int32_t pong_app(void* p) {
 	Pong* g = malloc(sizeof(Pong));
 	memset(g, 0, sizeof(Pong));
 	g->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+	g->imu_ok = imu_init();
+	if(g->imu_ok) g->tilt_base = read_tilt();
 	reset_game(g);
 
 	ViewPort* vp = view_port_alloc();
@@ -181,6 +203,8 @@ int32_t pong_app(void* p) {
 			} else if(in->key == InputKeyDown) {
 				if(in->type == InputTypePress) g->down = true;
 				else if(in->type == InputTypeRelease) g->down = false;
+			} else if(in->key == InputKeyOk && in->type == InputTypeLong) {
+				if(g->imu_ok) g->tilt_base = read_tilt();
 			} else if(in->key == InputKeyOk && in->type == InputTypeShort) {
 				if(g->over) reset_game(g);
 				else g->paused = !g->paused;
@@ -194,6 +218,7 @@ int32_t pong_app(void* p) {
 
 	furi_timer_stop(timer);
 	furi_timer_free(timer);
+	if(g->imu_ok) imu_deinit();
 	view_port_enabled_set(vp, false);
 	gui_remove_view_port(gui, vp);
 	view_port_free(vp);
