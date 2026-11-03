@@ -6,4 +6,5 @@ App(
 	requires=["gui"],
 	stack_size=2 * 1024,
 	fap_category="Tools",
+	fap_icon="imu_test.png",
 )
