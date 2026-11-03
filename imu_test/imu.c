@@ -3,7 +3,10 @@
 #include <furi.h>
 #include <furi_hal.h>
 
-#define IMU_SPI (&furi_hal_spi_bus_handle_external)
+// Same wiring as the official Air Mouse app: external SPI bus with chip
+// select on PC3 (pin 7), not the bus default PA4.
+static FuriHalSpiBusHandle imu_spi_handle;
+#define IMU_SPI (&imu_spi_handle)
 #define IMU_TIMEOUT 50
 
 #define REG_DEVICE_CONFIG 0x11
@@ -24,14 +27,11 @@ static void imu_write(uint8_t reg, uint8_t val) {
 }
 
 static bool imu_read(uint8_t reg, uint8_t* data, size_t len) {
-	uint8_t tx[8] = {0};
-	uint8_t rx[8] = {0};
-	if(len > sizeof(tx) - 1) return false;
-	tx[0] = reg | 0x80;
+	uint8_t cmd = reg | 0x80;
 	furi_hal_spi_acquire(IMU_SPI);
-	bool ok = furi_hal_spi_bus_trx(IMU_SPI, tx, rx, len + 1, IMU_TIMEOUT);
+	bool ok = furi_hal_spi_bus_tx(IMU_SPI, &cmd, 1, IMU_TIMEOUT) &&
+			  furi_hal_spi_bus_rx(IMU_SPI, data, len, IMU_TIMEOUT);
 	furi_hal_spi_release(IMU_SPI);
-	memcpy(data, rx + 1, len);
 	return ok;
 }
 
@@ -49,6 +49,8 @@ bool imu_init(void) {
 		furi_delay_ms(500);
 	}
 	if(!imu_spi_ready) {
+		memcpy(&imu_spi_handle, &furi_hal_spi_bus_handle_external, sizeof(FuriHalSpiBusHandle));
+		imu_spi_handle.cs = &gpio_ext_pc3;
 		furi_hal_spi_bus_handle_init(IMU_SPI);
 		imu_spi_ready = true;
 	}
@@ -56,14 +58,16 @@ bool imu_init(void) {
 	uint8_t who = 0;
 	for(int attempt = 0; attempt < 20 && who != WHO_AM_I_VALUE; attempt++) {
 		imu_write(REG_BANK_SEL, 0x00);
+		// SPI mode 0 + soft reset, as in the official driver.
+		imu_write(REG_DEVICE_CONFIG, 0x01);
+		furi_delay_ms(2);
+		who = 0;
 		imu_read(REG_WHO_AM_I, &who, 1);
 		if(who != WHO_AM_I_VALUE) furi_delay_ms(10);
 	}
 	imu_last_who = who;
 	if(who != WHO_AM_I_VALUE) return false;
 
-	imu_write(REG_DEVICE_CONFIG, 0x01);
-	furi_delay_ms(2);
 	imu_write(REG_BANK_SEL, 0x00);
 	// +/-2g full scale, 1 kHz output data rate
 	imu_write(REG_ACCEL_CONFIG0, 0x66);
