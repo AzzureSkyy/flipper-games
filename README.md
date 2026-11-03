@@ -5,6 +5,7 @@ Pong and Space Invaders for the Flipper Zero.
 ## Games
 - **pong**: Up/Down move, OK pause/restart, Back exit. First to 7 wins.
 - **space_invaders**: Left/Right move, OK fire/restart, Back exit. 3 lives.
+- **imu_test** (Tools): diagnostic for the Video Game Module motion sensor. See [Troubleshooting tilt](#troubleshooting-tilt).
 
 ## Video Game Module (TV + tilt controls)
 Built for the official Flipper Zero firmware.
@@ -26,10 +27,20 @@ If a game moves the wrong way or responds to the wrong kind of tilt, edit the se
 | `TILT_SPEED` | Sensitivity (higher = faster) |
 | `TILT_DEADZONE` | How much tilt is ignored around level |
 
-If the games only respond to buttons with the module attached, the sensor wasn't detected. The SPI settings in `imu.c` may need adjusting for your module.
+### Troubleshooting tilt
+The games turn on the GPIO 5V supply for the module, set up the GPIO SPI pins and retry sensor detection 5 times. If a game still only responds to buttons, run **IMU Test** (`Apps → Tools → IMU Test`):
+
+| Screen shows | Meaning |
+|---|---|
+| `Sensor: FOUND` and changing X/Y/Z | Sensor works. Tune the tilt settings above. |
+| `WHO_AM_I: 0x00` or `0xFF` | No reply over the GPIO pins. The module may route the sensor to its own RP2040 controller instead of the Flipper. |
+| Another `WHO_AM_I` value | A different sensor chip; `imu.c` needs a driver for it. |
+| `5V OTG: OFF` | The Flipper couldn't power the module. Check the connection and battery level. |
+
+Press OK to retry detection and Back to exit.
 
 ## Build
-Copy a game folder into `applications_user/` of the firmware and run `./fbt fap_pong` / `./fbt fap_space_invaders`, or run `ufbt` inside the game folder.
+Copy an app folder into `applications_user/` of the firmware and run `./fbt fap_pong` / `./fbt fap_space_invaders` / `./fbt fap_imu_test`, or run `ufbt` inside the app folder.
 
 ## Install
-Copy the built `.fap` files (`pong/dist/pong.fap`, `space_invaders/dist/space_invaders.fap` when using `ufbt`) to `SD:/apps/Games/` on the Flipper.
+Copy the built `.fap` files (`pong/dist/pong.fap`, `space_invaders/dist/space_invaders.fap` when using `ufbt`) to `SD:/apps/Games/` on the Flipper, and `imu_test/dist/imu_test.fap` to `SD:/apps/Tools/`.

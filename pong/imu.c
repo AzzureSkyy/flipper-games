@@ -35,9 +35,33 @@ static bool imu_read(uint8_t reg, uint8_t* data, size_t len) {
 	return ok;
 }
 
+static bool imu_otg_enabled_by_us = false;
+static bool imu_spi_ready = false;
+static uint8_t imu_last_who = 0;
+
+uint8_t imu_who_am_i(void) {
+	return imu_last_who;
+}
+
 bool imu_init(void) {
+	if(!furi_hal_power_is_otg_enabled()) {
+		imu_otg_enabled_by_us = furi_hal_power_enable_otg();
+		furi_delay_ms(50);
+	}
+	furi_hal_spi_bus_handle_init(IMU_SPI);
+	imu_spi_ready = true;
+
 	uint8_t who = 0;
-	if(!imu_read(REG_WHO_AM_I, &who, 1) || who != WHO_AM_I_VALUE) return false;
+	for(int attempt = 0; attempt < 5 && who != WHO_AM_I_VALUE; attempt++) {
+		imu_write(REG_BANK_SEL, 0x00);
+		imu_read(REG_WHO_AM_I, &who, 1);
+		if(who != WHO_AM_I_VALUE) furi_delay_ms(10);
+	}
+	imu_last_who = who;
+	if(who != WHO_AM_I_VALUE) {
+		imu_deinit();
+		return false;
+	}
 
 	imu_write(REG_DEVICE_CONFIG, 0x01);
 	furi_delay_ms(2);
@@ -61,5 +85,13 @@ bool imu_read_accel(float out_g[3]) {
 }
 
 void imu_deinit(void) {
-	imu_write(REG_PWR_MGMT0, 0x00);
+	if(imu_spi_ready) {
+		imu_write(REG_PWR_MGMT0, 0x00);
+		furi_hal_spi_bus_handle_deinit(IMU_SPI);
+		imu_spi_ready = false;
+	}
+	if(imu_otg_enabled_by_us) {
+		furi_hal_power_disable_otg();
+		imu_otg_enabled_by_us = false;
+	}
 }
