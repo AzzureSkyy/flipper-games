@@ -1,10 +1,11 @@
 # Flipper Games
 
-Pong and Space Invaders for the Flipper Zero.
+Pong, Space Invaders and DigiPet for the Flipper Zero.
 
 ## Games
 - **pong**: Up/Down move, OK pause/restart, Back exit. First to 7 wins.
 - **space_invaders**: Left/Right move, OK fire/restart, Back exit. 3 lives.
+- **digipet**: original digital-monster virtual pet. Left/Right choose Feed/Train/Battle/Clean/Medic/Status, OK selects, Back exits. Hatches from an egg into Blipling, then Clawpup, then Pyrodrake (good care) or Sludgeon (neglect). Saved to the SD card and keeps aging while closed (up to 24 h).
 - **imu_test** (Tools): diagnostic for the Video Game Module motion sensor. See [Troubleshooting tilt](#troubleshooting-tilt).
 
 ## Video Game Module (TV + tilt controls)
