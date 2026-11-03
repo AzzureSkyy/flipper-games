@@ -32,9 +32,11 @@ static void draw_cb(Canvas* canvas, void* ctx) {
 	canvas_draw_str(canvas, 2, 41, s->detected ? "Sensor: FOUND" : "Sensor: NOT FOUND");
 
 	if(s->detected) {
-		snprintf(line, sizeof(line), "X%+.2f Y%+.2f Z%+.2f", (double)s->accel[0],
-			(double)s->accel[1], (double)s->accel[2]);
+		snprintf(line, sizeof(line), "X%+5d Y%+5d Z%+5d mg", (int)(s->accel[0] * 1000.0f),
+			(int)(s->accel[1] * 1000.0f), (int)(s->accel[2] * 1000.0f));
 		canvas_draw_str(canvas, 2, 51, line);
+		snprintf(line, sizeof(line), "reads %lu", (unsigned long)s->reads);
+		canvas_draw_str(canvas, 80, 41, line);
 	} else {
 		canvas_draw_str(canvas, 2, 51, s->who == 0x00 || s->who == 0xFF ? "No reply on GPIO SPI" : "Unexpected chip ID");
 	}
@@ -48,7 +50,6 @@ static void input_cb(InputEvent* event, void* ctx) {
 }
 
 static void probe(ImuTestState* s) {
-	imu_deinit();
 	bool ok = imu_init();
 	uint8_t who = imu_who_am_i();
 	furi_mutex_acquire(s->mutex, FuriWaitForever);

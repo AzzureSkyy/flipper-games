@@ -46,22 +46,21 @@ uint8_t imu_who_am_i(void) {
 bool imu_init(void) {
 	if(!furi_hal_power_is_otg_enabled()) {
 		imu_otg_enabled_by_us = furi_hal_power_enable_otg();
-		furi_delay_ms(50);
+		furi_delay_ms(500);
 	}
-	furi_hal_spi_bus_handle_init(IMU_SPI);
-	imu_spi_ready = true;
+	if(!imu_spi_ready) {
+		furi_hal_spi_bus_handle_init(IMU_SPI);
+		imu_spi_ready = true;
+	}
 
 	uint8_t who = 0;
-	for(int attempt = 0; attempt < 5 && who != WHO_AM_I_VALUE; attempt++) {
+	for(int attempt = 0; attempt < 20 && who != WHO_AM_I_VALUE; attempt++) {
 		imu_write(REG_BANK_SEL, 0x00);
 		imu_read(REG_WHO_AM_I, &who, 1);
 		if(who != WHO_AM_I_VALUE) furi_delay_ms(10);
 	}
 	imu_last_who = who;
-	if(who != WHO_AM_I_VALUE) {
-		imu_deinit();
-		return false;
-	}
+	if(who != WHO_AM_I_VALUE) return false;
 
 	imu_write(REG_DEVICE_CONFIG, 0x01);
 	furi_delay_ms(2);
@@ -90,8 +89,7 @@ void imu_deinit(void) {
 		furi_hal_spi_bus_handle_deinit(IMU_SPI);
 		imu_spi_ready = false;
 	}
-	if(imu_otg_enabled_by_us) {
-		furi_hal_power_disable_otg();
-		imu_otg_enabled_by_us = false;
-	}
+	// Leave 5V on: the Video Game Module (RP2040 + HDMI) runs from it, and
+	// cutting it reboots the module.
+	imu_otg_enabled_by_us = false;
 }
